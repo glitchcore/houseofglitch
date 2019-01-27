@@ -2,6 +2,7 @@ using System;
 using UnityEngine;
 using UnityStandardAssets.CrossPlatformInput;
 using UnityStandardAssets.Utility;
+using UnityEngine.UI;
 using Random = UnityEngine.Random;
 
 
@@ -40,6 +41,9 @@ public class FirstPersonController : MonoBehaviour
     private float m_NextStep;
     private bool m_Jumping;
     private AudioSource m_AudioSource;
+
+    private Vector3 target_position = new Vector3(5,1,10);
+    private Vector3 diff_position;
 
     // Use this for initialization
     private void Start()
@@ -91,6 +95,8 @@ public class FirstPersonController : MonoBehaviour
     }
 
 
+    private float fdiff = 1.0f;
+
     private void FixedUpdate()
     {
         float speed;
@@ -130,6 +136,18 @@ public class FirstPersonController : MonoBehaviour
         UpdateCameraPosition(speed);
 
         m_MouseLook.UpdateCursorLock();
+
+        diff_position = target_position - transform.position;
+
+        if(!is_shoot) {
+            fdiff = 1.0f + diff_position.magnitude / 20.0f;
+            // f2 = 1.0f + diff_position.z / 20.0f;
+        }
+
+        if(fdiff < 1.1) {
+            is_shoot = true;
+            crosshair_text.text = "Ready to shoot!";
+        }
     }
 
     private void PlayJumpSound()
@@ -255,6 +273,75 @@ public class FirstPersonController : MonoBehaviour
             return;
         }
         body.AddForceAtPosition(m_CharacterController.velocity * 0.1f, hit.point, ForceMode.Impulse);
+    }
+
+    private float freq = 220.0f;
+    public float spread = 0.75f;
+    public float gain = 0.25f;
+
+    public float f1 = 2.0f;
+    public float f2 = 0.666f;
+
+
+    private float phase_sq;
+    private float phase_saw;
+    private float phase_1_saw;
+    private float phase_seq = 0.0f;
+
+    private float fs = 48000.0f;
+
+    private bool is_shoot = false;
+
+    [SerializeField] private Text crosshair_text;
+
+    float square(float phase) {
+        return phase < Mathf.PI ? -1.0f : 1.0f;
+    }
+
+    float saw(float phase) {
+        return -1.0f + phase / Mathf.PI;
+    }
+
+    void OnAudioFilterRead(float[] data, int channels) {
+
+        
+        
+
+        for(int i = 0; i < data.Length; i += channels) {
+
+            phase_sq += freq * 2.0f * Mathf.PI * f1 * fdiff / fs;
+            phase_saw += freq * 2.0f * Mathf.PI * f2 * fdiff  / fs;
+            phase_1_saw += freq * 2.0f * Mathf.PI * 1.0f / fs;
+
+            phase_seq += 4.0f / fs;
+
+            
+            
+
+            data[i] = gain * (
+                0.3f * square(phase_sq) +
+                0.3f * saw(phase_saw) + 
+                0.3f * saw(phase_1_saw)
+            ) * (is_shoot ? phase_seq : 1.0f);
+
+            if(channels == 2) {
+                data[i + 1] = data[i];
+            }
+
+            if(phase_sq > (Mathf.PI * 2)) {
+                phase_sq = 0.0f;
+            }
+            if(phase_saw > (Mathf.PI * 2)) {
+                phase_saw = 0.0f;
+            }
+            if(phase_1_saw > (Mathf.PI * 2)) {
+                phase_1_saw = 0.0f;
+            }
+
+            if(phase_seq > 1.0f) {
+                phase_seq = 0.0f;
+            }
+        }
     }
 }
 
