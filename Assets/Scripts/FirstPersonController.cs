@@ -42,7 +42,7 @@ public class FirstPersonController : MonoBehaviour
     private bool m_Jumping;
     private AudioSource m_AudioSource;
 
-    private Vector3 target_position = new Vector3(5,1,10);
+    private Vector3 init_position;
     private Vector3 diff_position;
 
     // Use this for initialization
@@ -58,6 +58,8 @@ public class FirstPersonController : MonoBehaviour
         m_Jumping = false;
         m_AudioSource = GetComponent<AudioSource>();
         m_MouseLook.Init(transform, m_Camera.transform);
+
+        init_position = transform.position;
     }
 
 
@@ -95,7 +97,9 @@ public class FirstPersonController : MonoBehaviour
     }
 
 
-    private float fdiff = 1.0f;
+    private float f1 = 1.0f;
+    private float f2 = 1.0f;
+    private float volume = 1.0f;
 
     private void FixedUpdate()
     {
@@ -137,17 +141,23 @@ public class FirstPersonController : MonoBehaviour
 
         m_MouseLook.UpdateCursorLock();
 
-        diff_position = target_position - transform.position;
+        diff_position = init_position - transform.position;
 
         if(!is_shoot) {
-            fdiff = 1.0f + diff_position.magnitude / 20.0f;
-            // f2 = 1.0f + diff_position.z / 20.0f;
+            f1 = 1.0f + diff_position.x / 20.0f;
+            f2 = 1.0f + diff_position.z / 20.0f;
+            volume = -diff_position.y / 3.0f - 0.2f;
+
+            if(volume < 0.0f) volume = 0.0f;
+            if(volume > 0.5f) volume = 0.5f;
         }
 
+        /*
         if(fdiff < 1.1) {
             is_shoot = true;
             crosshair_text.text = "Ready to shoot!";
         }
+        */
     }
 
     private void PlayJumpSound()
@@ -279,9 +289,6 @@ public class FirstPersonController : MonoBehaviour
     public float spread = 0.75f;
     public float gain = 0.25f;
 
-    public float f1 = 2.0f;
-    public float f2 = 0.666f;
-
 
     private float phase_sq;
     private float phase_saw;
@@ -309,20 +316,18 @@ public class FirstPersonController : MonoBehaviour
 
         for(int i = 0; i < data.Length; i += channels) {
 
-            phase_sq += freq * 2.0f * Mathf.PI * f1 * fdiff / fs;
-            phase_saw += freq * 2.0f * Mathf.PI * f2 * fdiff  / fs;
-            phase_1_saw += freq * 2.0f * Mathf.PI * 1.0f / fs;
+            phase_sq += freq * 2.0f * Mathf.PI * f1 / fs;
+            phase_saw += freq * 2.0f * Mathf.PI * f2  / fs;
 
-            phase_seq += 4.0f / fs;
+            phase_seq += 8.0f / fs;
 
             
             
 
             data[i] = gain * (
-                0.3f * square(phase_sq) +
-                0.3f * saw(phase_saw) + 
-                0.3f * saw(phase_1_saw)
-            ) * (is_shoot ? phase_seq : 1.0f);
+                0.5f * square(phase_sq) +
+                0.5f * saw(phase_saw)
+            ) * (phase_seq) * volume;
 
             if(channels == 2) {
                 data[i + 1] = data[i];
